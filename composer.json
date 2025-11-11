@@ -1,0 +1,17 @@
+{
+    "name": "lenovo/appnghiphep",
+    "autoload": {
+        "psr-4": {
+            "Lenovo\\Appnghiphep\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "kdarknessk1402",
+            "email": "kdarknessk1402@gmail.com"
+        }
+    ],
+    "require": {
+        "phpmailer/phpmailer": "^7.0"
+    }
+}

@@ -1,0 +1,14 @@
+[2025-11-11 02:03:14] User: Admin | Action: LOGIN_FAILED | Description: Sai mật khẩu
+[2025-11-11 02:03:25] User: admin | Action: LOGIN_FAILED | Description: Sai mật khẩu
+[2025-11-11 02:04:29] User: admin | Action: LOGIN_FAILED | Description: Sai mật khẩu
+[2025-11-11 02:04:41] User: manager | Action: LOGIN_FAILED | Description: Sai mật khẩu
+[2025-11-11 02:05:54] User: admin | Action: LOGIN_FAILED | Description: Sai mật khẩu
+[2025-11-11 02:07:03] User: admin | Action: LOGIN_FAILED | Description: Sai mật khẩu
+[2025-11-11 02:07:05] User: manager | Action: LOGIN_FAILED | Description: Sai mật khẩu
+[2025-11-11 02:07:08] User: user1 | Action: LOGIN_FAILED | Description: Sai mật khẩu
+[2025-11-11 02:09:34] User: admin | Action: LOGIN_FAILED | Description: Sai mật khẩu
+[2025-11-11 02:12:26] User: ADMIN001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-11 02:19:43] User: ADMIN001 | Action: LOGOUT | Description: Đăng xuất
+[2025-11-11 02:19:47] User: user1 | Action: LOGIN_FAILED | Description: Sai mật khẩu
+[2025-11-11 02:19:50] User: user1 | Action: LOGIN_FAILED | Description: Sai mật khẩu
+[2025-11-11 02:20:11] User: USER001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
