@@ -43,6 +43,165 @@ function formatDateTime($datetime, $format = 'd/m/Y H:i') {
     return date($format, $timestamp);
 }
 
+// Tính phép tồn còn dùng được (chỉ trong Q1)
+function getPhepTonConDungDuoc($userId, $pdo) {
+    $currentMonth = date('n'); // 1-12
+    $currentYear = date('Y');
+    
+    $stmt = $pdo->prepare("
+        SELECT 
+            SoNgayPhepTonNamTruoc,
+            NamPhepTon
+        FROM NguoiDung
+        WHERE MaNguoiDung = ?
+    ");
+    $stmt->execute([$userId]);
+    $user = $stmt->fetch();
+    
+    // Chỉ dùng phép tồn trong Q1 (tháng 1-3)
+    if ($currentMonth <= 3 && $user['NamPhepTon'] == ($currentYear - 1)) {
+        return $user['SoNgayPhepTonNamTruoc'];
+    }
+    
+    return 0;
+}
+
+// Tính tổng phép có thể dùng (phép năm nay + phép tồn)
+function getTongPhepCoTheDung($userId, $pdo) {
+    $stmt = $pdo->prepare("
+        SELECT 
+            SoNgayPhepNam,
+            SoNgayPhepDaDung,
+            SoNgayPhepTonNamTruoc,
+            NamPhepTon
+        FROM NguoiDung
+        WHERE MaNguoiDung = ?
+    ");
+    $stmt->execute([$userId]);
+    $user = $stmt->fetch();
+    
+    $phepNamNay = $user['SoNgayPhepNam'] - $user['SoNgayPhepDaDung'];
+    $phepTon = getPhepTonConDungDuoc($userId, $pdo);
+    
+    return $phepNamNay + $phepTon;
+}
+
+// Trừ phép khi duyệt đơn (ưu tiên phép tồn trước)
+function truPhepKhiDuyet($userId, $soNgayNghi, $pdo) {
+    $currentMonth = date('n');
+    $currentYear = date('Y');
+    
+    $stmt = $pdo->prepare("
+        SELECT 
+            SoNgayPhepDaDung,
+            SoNgayPhepTonNamTruoc,
+            NamPhepTon
+        FROM NguoiDung
+        WHERE MaNguoiDung = ?
+    ");
+    $stmt->execute([$userId]);
+    $user = $stmt->fetch();
+    
+    $soNgayCanTru = $soNgayNghi;
+    $truPhepTon = 0;
+    $truPhepNamNay = 0;
+    
+    // Nếu trong Q1 và có phép tồn → Ưu tiên trừ phép tồn trước
+    if ($currentMonth <= 3 && $user['NamPhepTon'] == ($currentYear - 1) && $user['SoNgayPhepTonNamTruoc'] > 0) {
+        if ($soNgayCanTru <= $user['SoNgayPhepTonNamTruoc']) {
+            // Đủ phép tồn
+            $truPhepTon = $soNgayCanTru;
+            $soNgayCanTru = 0;
+        } else {
+            // Trừ hết phép tồn, còn lại trừ phép năm nay
+            $truPhepTon = $user['SoNgayPhepTonNamTruoc'];
+            $soNgayCanTru -= $user['SoNgayPhepTonNamTruoc'];
+        }
+    }
+    
+    // Trừ vào phép năm nay
+    $truPhepNamNay = $soNgayCanTru;
+    
+    // Cập nhật database
+    $stmt = $pdo->prepare("
+        UPDATE NguoiDung
+        SET 
+            SoNgayPhepDaDung = SoNgayPhepDaDung + ?,
+            SoNgayPhepTonNamTruoc = SoNgayPhepTonNamTruoc - ?
+        WHERE MaNguoiDung = ?
+    ");
+    $stmt->execute([$truPhepNamNay, $truPhepTon, $userId]);
+    
+    return [
+        'tru_phep_ton' => $truPhepTon,
+        'tru_phep_nam_nay' => $truPhepNamNay,
+        'tong_tru' => $soNgayNghi
+    ];
+}
+
+// Kiểm tra ngày có phải T7/CN không
+function isWeekend($date) {
+    $dayOfWeek = date('w', strtotime($date));
+    return ($dayOfWeek == 0 || $dayOfWeek == 6); // 0 = Sunday, 6 = Saturday
+}
+
+// Validate ngày nghỉ bù (phải là T2-T6)
+function validateNgayNghiBu($date) {
+    if (isWeekend($date)) {
+        return ['valid' => false, 'message' => 'Ngày nghỉ bù phải là thứ 2-6, không thể là cuối tuần'];
+    }
+    return ['valid' => true];
+}
+
+// Validate ngày làm bù (phải là T7/CN)
+function validateNgayLamBu($date) {
+    if (!isWeekend($date)) {
+        return ['valid' => false, 'message' => 'Ngày làm bù phải là thứ 7 hoặc Chủ nhật'];
+    }
+    return ['valid' => true];
+}
+
+// Tính số ngày giữa 2 ngày (CÓ TÍNH NỬA NGÀY)
+function calculateDaysWithHalfDay($startDate, $endDate, $halfDayStart = 'Khong', $halfDayEnd = 'Khong', $includeWeekend = true) {
+    $start = new DateTime($startDate);
+    $end = new DateTime($endDate);
+    $end->modify('+1 day'); // Bao gồm cả ngày cuối
+    
+    $interval = $start->diff($end);
+    $days = $interval->days;
+    
+    // Trừ nửa ngày nếu có
+    if ($halfDayStart !== 'Khong') {
+        $days -= 0.5;
+    }
+    if ($halfDayEnd !== 'Khong') {
+        $days -= 0.5;
+    }
+    
+    if (!$includeWeekend) {
+        $period = new DatePeriod($start, new DateInterval('P1D'), $end);
+        $workDays = 0;
+        foreach ($period as $date) {
+            $dayOfWeek = $date->format('N');
+            if ($dayOfWeek < 6) { // 1-5 là thứ 2 đến thứ 6
+                $workDays++;
+            }
+        }
+        
+        // Điều chỉnh cho nửa ngày
+        if ($halfDayStart !== 'Khong') {
+            $workDays -= 0.5;
+        }
+        if ($halfDayEnd !== 'Khong') {
+            $workDays -= 0.5;
+        }
+        
+        return $workDays;
+    }
+    
+    return $days;
+}
+
 // Tính số ngày giữa 2 ngày
 function calculateDays($startDate, $endDate, $includeWeekend = true) {
     $start = new DateTime($startDate);

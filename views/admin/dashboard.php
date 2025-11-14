@@ -203,6 +203,11 @@ $pageTitle = "Quản lý đơn nghỉ phép";
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="employee_report.php">
+                            <i class="fas fa-calendar-check"></i> Bảng chấm công
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="settings.php">
                             <i class="fas fa-cog"></i> Cấu hình hệ thống
                         </a>
@@ -266,6 +271,13 @@ $pageTitle = "Quản lý đơn nghỉ phép";
                             <h4 class="mb-0"><?= $stats['total_users'] ?></h4>
                             <small>Người dùng</small>
                         </div>
+                    </div>
+
+                    <!-- Tạo đơn cho người dùng(áp dụng với nghỉ thai sản) -->
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <a href="create_leave_for_user.php" class="btn btn-success">
+                            <i class="fas fa-user-plus"></i> Tạo đơn cho nhân viên
+                        </a>
                     </div>
                 </div>
                 

@@ -12,3 +12,39 @@
 [2025-11-11 02:19:47] User: user1 | Action: LOGIN_FAILED | Description: Sai mật khẩu
 [2025-11-11 02:19:50] User: user1 | Action: LOGIN_FAILED | Description: Sai mật khẩu
 [2025-11-11 02:20:11] User: USER001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-11 07:54:50] User: USER001 | Action: CREATE_LEAVE | Description: Tạo đơn nghỉ phép: DN202511111863
+[2025-11-11 07:55:03] User: USER001 | Action: LOGOUT | Description: Đăng xuất
+[2025-11-11 07:55:07] User: ADMIN001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-11 07:55:27] User: ADMIN001 | Action: APPROVE_LEAVE | Description: Duyệt đơn: DN202511111863
+[2025-11-11 07:55:29] User: ADMIN001 | Action: LOGOUT | Description: Đăng xuất
+[2025-11-11 07:55:31] User: USER001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-11 07:56:58] User: USER001 | Action: LOGOUT | Description: Đăng xuất
+[2025-11-11 07:57:00] User: manager | Action: LOGIN_FAILED | Description: Sai mật khẩu
+[2025-11-11 07:57:28] User: MGR001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-11 08:01:58] User: MGR001 | Action: LOGOUT | Description: Đăng xuất
+[2025-11-11 08:02:00] User: USER001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-11 08:02:37] User: USER001 | Action: CREATE_LEAVE | Description: Tạo đơn nghỉ phép: DN202511115498
+[2025-11-11 08:14:34] User: USER001 | Action: LOGOUT | Description: Đăng xuất
+[2025-11-11 08:14:36] User: USER001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-11 08:14:57] User: MGR001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-11 08:15:04] User: MGR001 | Action: LOGOUT | Description: Đăng xuất
+[2025-11-11 08:15:06] User: ADMIN001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-11 08:15:16] User: ADMIN001 | Action: REJECT_LEAVE | Description: Từ chối đơn: DN202511115498
+[2025-11-11 08:15:42] User: USER001 | Action: CREATE_LEAVE | Description: Tạo đơn nghỉ phép: DN202511111853
+[2025-11-11 08:18:27] User: USER001 | Action: LOGOUT | Description: Đăng xuất
+[2025-11-11 08:19:10] User: USER001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-11 08:19:46] User: USER001 | Action: CREATE_LEAVE | Description: Tạo đơn nghỉ phép: DN202511112426
+[2025-11-11 08:20:31] User: ADMIN001 | Action: APPROVE_LEAVE | Description: Duyệt đơn: DN202511112426
+[2025-11-11 08:20:41] User: ADMIN001 | Action: REJECT_LEAVE | Description: Từ chối đơn: DN202511111853
+[2025-11-12 01:19:27] User: MGR001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-12 01:20:47] User: MGR001 | Action: LOGOUT | Description: Đăng xuất
+[2025-11-12 01:20:49] User: ADMIN001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-12 01:34:58] User: ADMIN001 | Action: LOGOUT | Description: Đăng xuất
+[2025-11-12 01:35:05] User: user2 | Action: LOGIN_FAILED | Description: Sai mật khẩu
+[2025-11-12 01:36:11] User: USER002 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-12 01:37:11] User: USER002 | Action: CREATE_LEAVE | Description: Tạo đơn nghỉ phép: DN202511123576
+[2025-11-12 01:37:23] User: USER002 | Action: LOGOUT | Description: Đăng xuất
+[2025-11-12 01:37:31] User: ADMIN001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-12 07:15:07] User: USER001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-14 01:01:54] User: USER001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-14 01:01:59] User: ADMIN001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công

@@ -226,7 +226,7 @@ $pageTitle = "Đăng nhập - Hệ thống nghỉ phép";
         
         <div class="text-center mt-3">
             <small class="text-white">
-                © 2024 APPNGHIPHEP. Phát triển bởi Your Team.
+                © 2025 APPNGHIPHEP. Phát triển bởi Khoa Công nghệ Thông tin.
             </small>
         </div>
     </div>

@@ -1,31 +1,47 @@
 <?php
-// views/user/create_leave.php - Tạo đơn nghỉ phép
+// views/user/create_leave.php - Tạo đơn nghỉ phép (CẢI TIẾN)
 require_once __DIR__ . '/../../includes/session.php';
 require_once __DIR__ . '/../../includes/functions.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/mail_config.php';
 
 requireLogin();
-requireRole('USER');
+requireAnyRole(['USER', 'ADMIN']); // Admin cũng có thể tạo đơn cho user
 
 $pdo = getDBConnection();
 $currentUser = getCurrentUser();
 
-// Lấy thông tin số ngày phép còn lại
+// Kiểm tra xem là Admin tạo cho user khác hay user tự tạo
+$isAdminCreateForOther = false;
+$targetUserId = $currentUser['id'];
+
+if (hasRole('ADMIN') && isset($_GET['for_user'])) {
+    $isAdminCreateForOther = true;
+    $targetUserId = $_GET['for_user'];
+}
+
+// Lấy thông tin user đích (người sẽ nghỉ phép)
 $stmt = $pdo->prepare("
-    SELECT SoNgayPhepNam, SoNgayPhepDaDung, 
-           (SoNgayPhepNam - SoNgayPhepDaDung) as SoNgayPhepConLai
-    FROM NguoiDung 
-    WHERE MaNguoiDung = ?
+    SELECT n.*, v.TenVaiTro,
+           (n.SoNgayPhepNam - n.SoNgayPhepDaDung) as SoNgayPhepConLai
+    FROM NguoiDung n
+    JOIN VaiTro v ON n.MaVaiTro = v.MaVaiTro
+    WHERE n.MaNguoiDung = ?
 ");
-$stmt->execute([$currentUser['id']]);
-$phepInfo = $stmt->fetch();
+$stmt->execute([$targetUserId]);
+$userInfo = $stmt->fetch();
+
+if (!$userInfo) {
+    die('Không tìm thấy thông tin người dùng');
+}
 
 // Xử lý form submit
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $loaiPhep = sanitizeInput($_POST['loai_phep'] ?? '');
     $ngayBatDau = $_POST['ngay_bat_dau'] ?? '';
     $ngayKetThuc = $_POST['ngay_ket_thuc'] ?? '';
+    $nuaNgayBatDau = $_POST['nua_ngay_bat_dau'] ?? 'Khong';
+    $nuaNgayKetThuc = $_POST['nua_ngay_ket_thuc'] ?? 'Khong';
     $lyDo = sanitizeInput($_POST['ly_do'] ?? '');
     
     $errors = [];
@@ -42,12 +58,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = "Ngày kết thúc phải sau ngày bắt đầu";
         }
         
-        // Tính số ngày nghỉ
-        $soNgayNghi = calculateDays($ngayBatDau, $ngayKetThuc, true);
+        // Tính số ngày nghỉ (CÓ TÍNH NỬA NGÀY)
+        $soNgayNghi = calculateDaysWithHalfDay(
+            $ngayBatDau, 
+            $ngayKetThuc, 
+            $nuaNgayBatDau, 
+            $nuaNgayKetThuc
+        );
         
-        // Kiểm tra số ngày phép còn lại
-        if ($soNgayNghi > $phepInfo['SoNgayPhepConLai']) {
-            $errors[] = "Số ngày nghỉ ($soNgayNghi) vượt quá số ngày phép còn lại ({$phepInfo['SoNgayPhepConLai']})";
+        // Kiểm tra số ngày phép còn lại (trừ phép thai sản)
+        if ($loaiPhep !== 'Phép thai sản' && $soNgayNghi > $userInfo['SoNgayPhepConLai']) {
+            $errors[] = "Số ngày nghỉ ($soNgayNghi) vượt quá số ngày phép còn lại ({$userInfo['SoNgayPhepConLai']})";
         }
     }
     
@@ -59,35 +80,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Insert đơn nghỉ phép
             $stmt = $pdo->prepare("
                 INSERT INTO DonNghiPhep 
-                (MaDon, MaNguoiDung, LoaiPhep, NgayBatDauNghi, NgayKetThucNghi, SoNgayNghi, LyDo, TrangThai)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'WAITING')
+                (MaDon, MaNguoiDung, NguoiTao, LoaiPhep, NgayBatDauNghi, NghiNuaNgayBatDau, 
+                 NgayKetThucNghi, NghiNuaNgayKetThuc, SoNgayNghi, LyDo, TrangThai)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'WAITING')
             ");
             
             $stmt->execute([
                 $maDon,
-                $currentUser['id'],
+                $targetUserId,
+                $currentUser['id'], // Người tạo đơn
                 $loaiPhep,
                 $ngayBatDau,
+                $nuaNgayBatDau,
                 $ngayKetThuc,
+                $nuaNgayKetThuc,
                 $soNgayNghi,
                 $lyDo
             ]);
             
-            // Gửi email thông báo cho admin/manager
-            $emailAdmin = $pdo->query("
+            // Gửi email thông báo cho Manager của khoa/phòng và Admin
+            $emailList = [];
+            
+            // Lấy email của Manager cùng khoa/phòng
+            $stmt = $pdo->prepare("
                 SELECT Email FROM NguoiDung n
                 JOIN VaiTro v ON n.MaVaiTro = v.MaVaiTro
-                WHERE v.TenVaiTro IN ('ADMIN', 'MANAGER')
+                WHERE v.TenVaiTro = 'MANAGER' 
+                AND n.KhoaPhong = ?
+            ");
+            $stmt->execute([$userInfo['KhoaPhong']]);
+            $managerEmails = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            // Lấy email của tất cả Admin
+            $adminEmails = $pdo->query("
+                SELECT Email FROM NguoiDung n
+                JOIN VaiTro v ON n.MaVaiTro = v.MaVaiTro
+                WHERE v.TenVaiTro = 'ADMIN'
             ")->fetchAll(PDO::FETCH_COLUMN);
             
-            if (!empty($emailAdmin)) {
-                sendLeaveRequestNotification($maDon, $emailAdmin, 'create');
+            // Gộp danh sách email (loại bỏ trùng lặp)
+            $emailList = array_unique(array_merge($managerEmails, $adminEmails));
+            
+            if (!empty($emailList)) {
+                sendLeaveRequestNotification($maDon, $emailList, 'create');
             }
             
             // Log activity
-            logActivity($currentUser['id'], 'CREATE_LEAVE', "Tạo đơn nghỉ phép: $maDon");
+            logActivity($currentUser['id'], 'CREATE_LEAVE', "Tạo đơn nghỉ phép: $maDon" . 
+                ($isAdminCreateForOther ? " cho user: $targetUserId" : ""));
             
-            redirectWithMessage('my_leaves.php', 'success', "Tạo đơn nghỉ phép thành công! Mã đơn: $maDon");
+            if ($isAdminCreateForOther) {
+                redirectWithMessage('../admin/dashboard.php', 'success', "Tạo đơn nghỉ phép thành công! Mã đơn: $maDon");
+            } else {
+                redirectWithMessage('my_leaves.php', 'success', "Tạo đơn nghỉ phép thành công! Mã đơn: $maDon");
+            }
             
         } catch (PDOException $e) {
             $errors[] = "Lỗi hệ thống: " . $e->getMessage();
@@ -114,6 +160,8 @@ $pageTitle = "Tạo đơn nghỉ phép";
         .sidebar .nav-link:hover, .sidebar .nav-link.active { background-color: #667eea; color: white; }
         .card { border: none; border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); }
         .info-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        .half-day-option { display: none; }
+        .maternity-info { display: none; background-color: #fff3cd; padding: 15px; border-radius: 8px; margin-top: 15px; }
     </style>
 </head>
 <body>
@@ -126,6 +174,7 @@ $pageTitle = "Tạo đơn nghỉ phép";
             <div class="ms-auto d-flex align-items-center">
                 <span class="text-white me-3">
                     <i class="fas fa-user-circle"></i> <?= htmlspecialchars($currentUser['fullname']) ?>
+                    <?= getRoleBadge($currentUser['role']) ?>
                 </span>
                 <a href="../../controllers/AuthController.php?action=logout" class="btn btn-outline-light btn-sm">
                     <i class="fas fa-sign-out-alt"></i> Đăng xuất
@@ -140,15 +189,17 @@ $pageTitle = "Tạo đơn nghỉ phép";
             <div class="col-md-2 sidebar p-0">
                 <ul class="nav flex-column">
                     <li class="nav-item">
-                        <a class="nav-link" href="dashboard.php">
+                        <a class="nav-link" href="<?= hasRole('ADMIN') ? '../admin/dashboard.php' : 'dashboard.php' ?>">
                             <i class="fas fa-home"></i> Trang chủ
                         </a>
                     </li>
+                    <?php if (!hasRole('ADMIN')): ?>
                     <li class="nav-item">
                         <a class="nav-link" href="my_leaves.php">
                             <i class="fas fa-list"></i> Đơn của tôi
                         </a>
                     </li>
+                    <?php endif; ?>
                     <li class="nav-item">
                         <a class="nav-link active" href="create_leave.php">
                             <i class="fas fa-plus-circle"></i> Tạo đơn mới
@@ -166,6 +217,9 @@ $pageTitle = "Tạo đơn nghỉ phép";
             <div class="col-md-10 p-4">
                 <h2 class="mb-4">
                     <i class="fas fa-plus-circle"></i> Tạo đơn nghỉ phép mới
+                    <?php if ($isAdminCreateForOther): ?>
+                        <span class="badge bg-warning">Admin tạo cho: <?= htmlspecialchars($userInfo['HoTen']) ?></span>
+                    <?php endif; ?>
                 </h2>
                 
                 <?php if (!empty($errors)): ?>
@@ -183,17 +237,21 @@ $pageTitle = "Tạo đơn nghỉ phép";
                 <!-- Thông tin số ngày phép -->
                 <div class="info-box">
                     <div class="row text-center">
-                        <div class="col-md-4">
-                            <h3><?= $phepInfo['SoNgayPhepNam'] ?></h3>
+                        <div class="col-md-3">
+                            <h3><?= $userInfo['SoNgayPhepNam'] ?></h3>
                             <p class="mb-0">Tổng số ngày phép năm</p>
                         </div>
-                        <div class="col-md-4">
-                            <h3><?= $phepInfo['SoNgayPhepDaDung'] ?></h3>
+                        <div class="col-md-3">
+                            <h3><?= $userInfo['SoNgayPhepDaDung'] ?></h3>
                             <p class="mb-0">Đã sử dụng</p>
                         </div>
-                        <div class="col-md-4">
-                            <h3><?= $phepInfo['SoNgayPhepConLai'] ?></h3>
+                        <div class="col-md-3">
+                            <h3><?= $userInfo['SoNgayPhepConLai'] ?></h3>
                             <p class="mb-0">Còn lại</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h3><i class="fas fa-<?= $userInfo['GioiTinh'] == 'Nu' ? 'venus' : 'mars' ?>"></i></h3>
+                            <p class="mb-0"><?= $userInfo['GioiTinh'] == 'Nu' ? 'Nữ' : 'Nam' ?></p>
                         </div>
                     </div>
                 </div>
@@ -207,13 +265,15 @@ $pageTitle = "Tạo đơn nghỉ phép";
                                     <label class="form-label fw-bold">
                                         <i class="fas fa-tag"></i> Loại phép <span class="text-danger">*</span>
                                     </label>
-                                    <select class="form-select" name="loai_phep" required>
+                                    <select class="form-select" name="loai_phep" id="loaiPhep" required>
                                         <option value="">-- Chọn loại phép --</option>
                                         <option value="Phép năm">Phép năm</option>
                                         <option value="Phép ốm">Phép ốm</option>
                                         <option value="Phép việc riêng">Phép việc riêng</option>
                                         <option value="Phép không lương">Phép không lương</option>
-                                        <option value="Phép thai sản">Phép thai sản</option>
+                                        <?php if ($userInfo['GioiTinh'] == 'Nu'): ?>
+                                        <option value="Phép thai sản">Phép thai sản (Chỉ dành cho nữ)</option>
+                                        <?php endif; ?>
                                         <option value="Phép hiếu">Phép hiếu</option>
                                         <option value="Phép hỷ">Phép hỷ</option>
                                     </select>
@@ -224,8 +284,15 @@ $pageTitle = "Tạo đơn nghỉ phép";
                                         <i class="fas fa-info-circle"></i> Số ngày phép còn lại
                                     </label>
                                     <input type="text" class="form-control bg-light" 
-                                           value="<?= $phepInfo['SoNgayPhepConLai'] ?> ngày" readonly>
+                                           value="<?= $userInfo['SoNgayPhepConLai'] ?> ngày" readonly>
                                 </div>
+                            </div>
+                            
+                            <!-- Thông báo phép thai sản -->
+                            <div class="maternity-info" id="maternityInfo">
+                                <i class="fas fa-baby"></i> <strong>Lưu ý:</strong> 
+                                Phép thai sản mặc định là 6 tháng (180 ngày). 
+                                Ngày kết thúc sẽ tự động được tính từ ngày bắt đầu + 6 tháng.
                             </div>
                             
                             <div class="row">
@@ -235,6 +302,29 @@ $pageTitle = "Tạo đơn nghỉ phép";
                                     </label>
                                     <input type="date" class="form-control" name="ngay_bat_dau" 
                                            id="ngayBatDau" required min="<?= date('Y-m-d') ?>">
+                                    
+                                    <!-- Option nửa ngày bắt đầu -->
+                                    <div class="half-day-option mt-2" id="halfDayStartOption">
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="nua_ngay_bat_dau" 
+                                                   id="fullDayStart" value="Khong" checked>
+                                            <label class="form-check-label" for="fullDayStart">Cả ngày</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="nua_ngay_bat_dau" 
+                                                   id="morningStart" value="Sang">
+                                            <label class="form-check-label" for="morningStart">
+                                                <i class="fas fa-sun text-warning"></i> Sáng (0.5 ngày)
+                                            </label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="nua_ngay_bat_dau" 
+                                                   id="afternoonStart" value="Chieu">
+                                            <label class="form-check-label" for="afternoonStart">
+                                                <i class="fas fa-moon text-primary"></i> Chiều (0.5 ngày)
+                                            </label>
+                                        </div>
+                                    </div>
                                 </div>
                                 
                                 <div class="col-md-6 mb-3">
@@ -243,6 +333,29 @@ $pageTitle = "Tạo đơn nghỉ phép";
                                     </label>
                                     <input type="date" class="form-control" name="ngay_ket_thuc" 
                                            id="ngayKetThuc" required min="<?= date('Y-m-d') ?>">
+                                    
+                                    <!-- Option nửa ngày kết thúc -->
+                                    <div class="half-day-option mt-2" id="halfDayEndOption">
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="nua_ngay_ket_thuc" 
+                                                   id="fullDayEnd" value="Khong" checked>
+                                            <label class="form-check-label" for="fullDayEnd">Cả ngày</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="nua_ngay_ket_thuc" 
+                                                   id="morningEnd" value="Sang">
+                                            <label class="form-check-label" for="morningEnd">
+                                                <i class="fas fa-sun text-warning"></i> Sáng (0.5 ngày)
+                                            </label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="nua_ngay_ket_thuc" 
+                                                   id="afternoonEnd" value="Chieu">
+                                            <label class="form-check-label" for="afternoonEnd">
+                                                <i class="fas fa-moon text-primary"></i> Chiều (0.5 ngày)
+                                            </label>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -252,7 +365,7 @@ $pageTitle = "Tạo đơn nghỉ phép";
                                 </label>
                                 <input type="text" class="form-control bg-light" id="soNgayNghi" 
                                        value="0 ngày" readonly>
-                                <small class="text-muted">Tự động tính dựa trên ngày bắt đầu và kết thúc</small>
+                                <small class="text-muted">Tự động tính dựa trên ngày bắt đầu và kết thúc (có tính nửa ngày)</small>
                             </div>
                             
                             <div class="mb-3">
@@ -271,7 +384,8 @@ $pageTitle = "Tạo đơn nghỉ phép";
                             </div>
                             
                             <div class="text-end">
-                                <a href="my_leaves.php" class="btn btn-secondary">
+                                <a href="<?= $isAdminCreateForOther ? '../admin/dashboard.php' : 'my_leaves.php' ?>" 
+                                   class="btn btn-secondary">
                                     <i class="fas fa-times"></i> Hủy
                                 </a>
                                 <button type="submit" class="btn btn-primary">
@@ -287,33 +401,107 @@ $pageTitle = "Tạo đơn nghỉ phép";
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Tự động tính số ngày nghỉ
-        function calculateLeaveDays() {
-            const startDate = document.getElementById('ngayBatDau').value;
-            const endDate = document.getElementById('ngayKetThuc').value;
-            
-            if (startDate && endDate) {
-                const start = new Date(startDate);
-                const end = new Date(endDate);
-                
-                if (end >= start) {
-                    const diffTime = Math.abs(end - start);
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-                    document.getElementById('soNgayNghi').value = diffDays + ' ngày';
-                } else {
-                    document.getElementById('soNgayNghi').value = '0 ngày';
-                    alert('Ngày kết thúc phải sau ngày bắt đầu!');
-                }
-            }
-        }
+        const loaiPhepSelect = document.getElementById('loaiPhep');
+        const ngayBatDau = document.getElementById('ngayBatDau');
+        const ngayKetThuc = document.getElementById('ngayKetThuc');
+        const soNgayNghiInput = document.getElementById('soNgayNghi');
+        const halfDayStartOption = document.getElementById('halfDayStartOption');
+        const halfDayEndOption = document.getElementById('halfDayEndOption');
+        const maternityInfo = document.getElementById('maternityInfo');
         
-        document.getElementById('ngayBatDau').addEventListener('change', calculateLeaveDays);
-        document.getElementById('ngayKetThuc').addEventListener('change', calculateLeaveDays);
+        // Xử lý khi chọn loại phép
+        loaiPhepSelect.addEventListener('change', function() {
+            const loaiPhep = this.value;
+            
+            if (loaiPhep === 'Phép thai sản') {
+                // Hiển thị thông báo thai sản
+                maternityInfo.style.display = 'block';
+                halfDayStartOption.style.display = 'none';
+                halfDayEndOption.style.display = 'none';
+                
+                // Auto set ngày kết thúc = ngày bắt đầu + 6 tháng
+                if (ngayBatDau.value) {
+                    const startDate = new Date(ngayBatDau.value);
+                    startDate.setMonth(startDate.getMonth() + 6);
+                    ngayKetThuc.value = startDate.toISOString().split('T')[0];
+                    ngayKetThuc.readOnly = true;
+                    calculateLeaveDays();
+                }
+            } else if (loaiPhep === 'Phép năm' || loaiPhep === 'Phép việc riêng') {
+                // Hiển thị option nửa ngày
+                maternityInfo.style.display = 'none';
+                halfDayStartOption.style.display = 'block';
+                halfDayEndOption.style.display = 'block';
+                ngayKetThuc.readOnly = false;
+            } else {
+                // Ẩn tất cả
+                maternityInfo.style.display = 'none';
+                halfDayStartOption.style.display = 'none';
+                halfDayEndOption.style.display = 'none';
+                ngayKetThuc.readOnly = false;
+            }
+            
+            calculateLeaveDays();
+        });
+        
+        // Xử lý khi chọn ngày bắt đầu (cho phép thai sản)
+        ngayBatDau.addEventListener('change', function() {
+            if (loaiPhepSelect.value === 'Phép thai sản' && this.value) {
+                const startDate = new Date(this.value);
+                startDate.setMonth(startDate.getMonth() + 6);
+                ngayKetThuc.value = startDate.toISOString().split('T')[0];
+            }
+            calculateLeaveDays();
+        });
+        
+        ngayKetThuc.addEventListener('change', calculateLeaveDays);
+        
+        // Xử lý khi chọn nửa ngày
+        document.querySelectorAll('input[name="nua_ngay_bat_dau"], input[name="nua_ngay_ket_thuc"]').forEach(radio => {
+            radio.addEventListener('change', calculateLeaveDays);
+        });
+        
+        // Hàm tính số ngày nghỉ (CÓ TÍNH NỬA NGÀY)
+        function calculateLeaveDays() {
+            const startDate = ngayBatDau.value;
+            const endDate = ngayKetThuc.value;
+            
+            if (!startDate || !endDate) {
+                soNgayNghiInput.value = '0 ngày';
+                return;
+            }
+            
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            
+            if (end < start) {
+                soNgayNghiInput.value = '0 ngày';
+                alert('Ngày kết thúc phải sau ngày bắt đầu!');
+                return;
+            }
+            
+            // Tính số ngày cơ bản
+            const diffTime = Math.abs(end - start);
+            let diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            
+            // Trừ đi nếu có nửa ngày
+            const nuaNgayBatDau = document.querySelector('input[name="nua_ngay_bat_dau"]:checked')?.value || 'Khong';
+            const nuaNgayKetThuc = document.querySelector('input[name="nua_ngay_ket_thuc"]:checked')?.value || 'Khong';
+            
+            if (nuaNgayBatDau !== 'Khong') {
+                diffDays -= 0.5;
+            }
+            if (nuaNgayKetThuc !== 'Khong') {
+                diffDays -= 0.5;
+            }
+            
+            soNgayNghiInput.value = diffDays + ' ngày';
+        }
         
         // Validate form
         document.getElementById('leaveForm').addEventListener('submit', function(e) {
-            const startDate = document.getElementById('ngayBatDau').value;
-            const endDate = document.getElementById('ngayKetThuc').value;
+            const startDate = ngayBatDau.value;
+            const endDate = ngayKetThuc.value;
             
             if (!startDate || !endDate) {
                 e.preventDefault();

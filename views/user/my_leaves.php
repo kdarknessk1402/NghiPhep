@@ -63,17 +63,28 @@ $stmt->execute($params);
 $leaves = $stmt->fetchAll();
 
 // Thống kê
-$stats = [
-    'total' => $pdo->prepare("SELECT COUNT(*) FROM DonNghiPhep WHERE MaNguoiDung = ?"),
-    'waiting' => $pdo->prepare("SELECT COUNT(*) FROM DonNghiPhep WHERE MaNguoiDung = ? AND TrangThai = 'WAITING'"),
-    'accepted' => $pdo->prepare("SELECT COUNT(*) FROM DonNghiPhep WHERE MaNguoiDung = ? AND TrangThai = 'ACCEPT'"),
-    'denied' => $pdo->prepare("SELECT COUNT(*) FROM DonNghiPhep WHERE MaNguoiDung = ? AND TrangThai = 'DENY'")
-];
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM DonNghiPhep WHERE MaNguoiDung = ?");
+$stmt->execute([$currentUser['id']]);
+$totalStat = $stmt->fetchColumn();
 
-foreach ($stats as $key => $stmt) {
-    $stmt->execute([$currentUser['id']]);
-    $stats[$key] = $stmt->fetchColumn();
-}
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM DonNghiPhep WHERE MaNguoiDung = ? AND TrangThai = 'WAITING'");
+$stmt->execute([$currentUser['id']]);
+$waitingStat = $stmt->fetchColumn();
+
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM DonNghiPhep WHERE MaNguoiDung = ? AND TrangThai = 'ACCEPT'");
+$stmt->execute([$currentUser['id']]);
+$acceptedStat = $stmt->fetchColumn();
+
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM DonNghiPhep WHERE MaNguoiDung = ? AND TrangThai = 'DENY'");
+$stmt->execute([$currentUser['id']]);
+$deniedStat = $stmt->fetchColumn();
+
+$stats = [
+    'total' => $totalStat,
+    'waiting' => $waitingStat,
+    'accepted' => $acceptedStat,
+    'denied' => $deniedStat
+];
 
 $pageTitle = "Đơn nghỉ phép của tôi";
 ?>

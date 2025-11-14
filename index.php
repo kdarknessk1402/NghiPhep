@@ -6,8 +6,10 @@ require_once 'includes/session.php';
 
 // Redirect về trang phù hợp
 if (isLoggedIn()) {
+    // Đã đăng nhập → Chuyển về dashboard theo role
     header('Location: ' . getHomePage());
 } else {
+    // Chưa đăng nhập → Chuyển về trang login
     header('Location: views/login.php');
 }
 exit;
