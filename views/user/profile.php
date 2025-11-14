@@ -4,10 +4,17 @@ require_once __DIR__ . '/../../includes/session.php';
 require_once __DIR__ . '/../../includes/functions.php';
 require_once __DIR__ . '/../../config/database.php';
 
+
 requireLogin();
 
 $pdo = getDBConnection();
 $currentUser = getCurrentUser();
+
+// Lấy dữ liệu role và khoa/phòng
+$stmt = $pdo->query("SELECT id, name FROM departments ORDER BY name");
+$departmentsList = $stmt->fetchAll();
+$stmt = $pdo->query("SELECT id, name FROM roles ORDER BY name");
+$rolesList = $stmt->fetchAll();
 
 // Lấy thông tin chi tiết người dùng
 $stmt = $pdo->prepare("
@@ -51,6 +58,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             setFlashMessage('error', 'Email không hợp lệ');
         }
     }
+
+    
     
     if ($action === 'change_password') {
         $oldPassword = $_POST['old_password'] ?? '';
@@ -296,16 +305,28 @@ $pageTitle = "Thông tin cá nhân";
                                     </div>
                                     
                                     <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label fw-bold">Vị trí</label>
-                                            <input type="text" class="form-control" name="vi_tri" 
-                                                   value="<?= htmlspecialchars($userInfo['ViTri']) ?>">
-                                        </div>
-                                        
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label fw-bold">Khoa/Phòng</label>
-                                            <input type="text" class="form-control" name="khoa_phong" 
-                                                   value="<?= htmlspecialchars($userInfo['KhoaPhong']) ?>">
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label fw-bold">Vai trò</label>
+                                                <select name="vai_tro" class="form-select">
+                                                    <?php foreach ($rolesList as $role): ?>
+                                                    <option value="<?= $role['name'] ?>" <?= ($userInfo['TenVaiTro'] == $role['name']) ? 'selected' : '' ?>>
+                                                        <?= $role['name'] ?>
+                                                    </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label fw-bold">Khoa/Phòng</label>
+                                                <select name="khoa_phong" class="form-select">
+                                                    <?php foreach ($departmentsList as $dep): ?>
+                                                    <option value="<?= $dep['name'] ?>" <?= ($userInfo['KhoaPhong'] == $dep['name']) ? 'selected' : '' ?>>
+                                                        <?= $dep['name'] ?>
+                                                    </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
                                         </div>
                                     </div>
                                     
