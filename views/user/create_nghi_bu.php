@@ -152,7 +152,7 @@ $pageTitle = "Đăng ký nghỉ bù - Làm bù";
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="profile.php">
-                            <i class="fas fa-user"></i> Thông tin cá nhân
+                            <i class="fas fa-user"></i> Quản lý tài khoản
                         </a>
                     </li>
                 </ul>

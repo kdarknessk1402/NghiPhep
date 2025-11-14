@@ -1,5 +1,5 @@
 <?php
-// views/user/dashboard.php - Dashboard User
+// views/user/dashboard.php - Dashboard User (FIXED)
 require_once __DIR__ . '/../../includes/session.php';
 require_once __DIR__ . '/../../includes/functions.php';
 require_once __DIR__ . '/../../config/database.php';
@@ -10,51 +10,34 @@ requireRole('USER');
 $pdo = getDBConnection();
 $currentUser = getCurrentUser();
 
-// Lấy thông tin user chi tiết (CÓ PHÉP TỒN)
+// Lấy thông tin user chi tiết (CÓ PHÉP TỒN) - FIXED NULL SAFETY
 $stmt = $pdo->prepare("
-    SELECT * FROM v_ThongKePhep
-    WHERE MaNguoiDung = ?
+    SELECT n.*, v.TenVaiTro,
+           (n.SoNgayPhepNam - n.SoNgayPhepDaDung) as SoNgayPhepConLai,
+           COALESCE(n.SoNgayPhepTonNamTruoc, 0) as SoNgayPhepTonNamTruoc,
+           n.NamPhepTon,
+           CASE 
+               WHEN MONTH(CURDATE()) <= 3 AND n.NamPhepTon = YEAR(CURDATE()) - 1
+               THEN COALESCE(n.SoNgayPhepTonNamTruoc, 0)
+               ELSE 0
+           END as PhepTonConDungDuoc,
+           (n.SoNgayPhepNam - n.SoNgayPhepDaDung) + 
+           CASE 
+               WHEN MONTH(CURDATE()) <= 3 AND n.NamPhepTon = YEAR(CURDATE()) - 1
+               THEN COALESCE(n.SoNgayPhepTonNamTruoc, 0)
+               ELSE 0
+           END as TongPhepCoTheDung
+    FROM NguoiDung n
+    JOIN VaiTro v ON n.MaVaiTro = v.MaVaiTro
+    WHERE n.MaNguoiDung = ?
 ");
 $stmt->execute([$currentUser['id']]);
 $userInfo = $stmt->fetch();
 
-// Nếu view chưa có, lấy từ bảng gốc
-if (!$userInfo) {
-    $stmt = $pdo->prepare("
-        SELECT n.*, v.TenVaiTro,
-               (n.SoNgayPhepNam - n.SoNgayPhepDaDung) as SoNgayPhepConLai,
-               n.SoNgayPhepTonNamTruoc,
-               n.NamPhepTon,
-               CASE 
-                   WHEN MONTH(CURDATE()) <= 3 AND n.NamPhepTon = YEAR(CURDATE()) - 1
-                   THEN n.SoNgayPhepTonNamTruoc
-                   ELSE 0
-               END as PhepTonConDungDuoc,
-               (n.SoNgayPhepNam - n.SoNgayPhepDaDung) + 
-               CASE 
-                   WHEN MONTH(CURDATE()) <= 3 AND n.NamPhepTon = YEAR(CURDATE()) - 1
-                   THEN n.SoNgayPhepTonNamTruoc
-                   ELSE 0
-               END as TongPhepCoTheDung
-        FROM NguoiDung n
-        JOIN VaiTro v ON n.MaVaiTro = v.MaVaiTro
-        WHERE n.MaNguoiDung = ?
-    ");
-    $stmt->execute([$currentUser['id']]);
-    $userInfo = $stmt->fetch();
-}
-
-// Thống kê nghỉ bù
-$stmt = $pdo->prepare("
-    SELECT 
-        COUNT(CASE WHEN TrangThai = 'Cho_lam_bu' THEN 1 END) as ChoLamBu,
-        COUNT(CASE WHEN TrangThai = 'Da_lam_bu' THEN 1 END) as DaLamBu,
-        SUM(CASE WHEN TrangThai = 'Cho_lam_bu' THEN SoNgayNghi ELSE 0 END) as SoNgayChoLamBu
-    FROM NghiBu
-    WHERE MaNguoiDung = ?
-");
-$stmt->execute([$currentUser['id']]);
-$nghiBuStats = $stmt->fetch();
+// Đảm bảo các giá trị không bị NULL
+$userInfo['ViTri'] = $userInfo['ViTri'] ?? 'Chưa cập nhật';
+$userInfo['KhoaPhong'] = $userInfo['KhoaPhong'] ?? 'Chưa cập nhật';
+$userInfo['SoNgayPhepTonNamTruoc'] = $userInfo['SoNgayPhepTonNamTruoc'] ?? 0;
 
 // Thống kê đơn
 $stmt = $pdo->prepare("SELECT COUNT(*) FROM DonNghiPhep WHERE MaNguoiDung = ?");
@@ -201,8 +184,13 @@ $pageTitle = "Dashboard - Nhân viên";
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="nghi_bu.php">
+                            <i class="fas fa-exchange-alt"></i> Nghỉ bù - Làm bù
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="profile.php">
-                            <i class="fas fa-user"></i> Thông tin cá nhân
+                            <i class="fas fa-user"></i> Quản lý tài khoản
                         </a>
                     </li>
                 </ul>
@@ -258,7 +246,7 @@ $pageTitle = "Dashboard - Nhân viên";
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="text-muted mb-1">Đã dùng</h6>
-                                    <h3 class="mb-0"><?= $userInfo['SoNgayPhepDaDung'] ?></h3>
+                                    <h3 class="mb-0"><?= number_format($userInfo['SoNgayPhepDaDung'], 1) ?></h3>
                                     <small class="text-muted">ngày</small>
                                 </div>
                                 <div class="stat-icon bg-warning text-white">
@@ -273,7 +261,7 @@ $pageTitle = "Dashboard - Nhân viên";
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="text-muted mb-1">Còn lại</h6>
-                                    <h3 class="mb-0 text-success"><?= $userInfo['SoNgayPhepConLai'] ?></h3>
+                                    <h3 class="mb-0 text-success"><?= number_format($userInfo['SoNgayPhepConLai'], 1) ?></h3>
                                     <small class="text-muted">ngày</small>
                                 </div>
                                 <div class="stat-icon bg-success text-white">
@@ -380,7 +368,7 @@ $pageTitle = "Dashboard - Nhân viên";
                                             <td><?= htmlspecialchars($leave['LoaiPhep']) ?></td>
                                             <td><?= formatDate($leave['NgayBatDauNghi']) ?></td>
                                             <td><?= formatDate($leave['NgayKetThucNghi']) ?></td>
-                                            <td><strong><?= $leave['SoNgayNghi'] ?></strong> ngày</td>
+                                            <td><strong><?= number_format($leave['SoNgayNghi'], 1) ?></strong> ngày</td>
                                             <td><?= getStatusBadge($leave['TrangThai']) ?></td>
                                             <td>
                                                 <small><?= formatDateTime($leave['NgayTao']) ?></small>
@@ -424,7 +412,7 @@ $pageTitle = "Dashboard - Nhân viên";
                                                             </tr>
                                                             <tr>
                                                                 <th>Số ngày nghỉ:</th>
-                                                                <td><strong><?= $leave['SoNgayNghi'] ?></strong> ngày</td>
+                                                                <td><strong><?= number_format($leave['SoNgayNghi'], 1) ?></strong> ngày</td>
                                                             </tr>
                                                             <tr>
                                                                 <th>Lý do:</th>

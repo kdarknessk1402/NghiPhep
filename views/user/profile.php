@@ -149,8 +149,13 @@ $pageTitle = "Thông tin cá nhân";
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="nghi_bu.php">
+                            <i class="fas fa-exchange-alt"></i> Nghỉ bù - Làm bù
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link active" href="profile.php">
-                            <i class="fas fa-user"></i> Thông tin cá nhân
+                            <i class="fas fa-user"></i> Quản lý tài khoản
                         </a>
                     </li>
                 </ul>
@@ -287,6 +292,7 @@ $pageTitle = "Thông tin cá nhân";
                                         </label>
                                         <input type="email" class="form-control" name="email" 
                                                value="<?= htmlspecialchars($userInfo['Email']) ?>" required>
+                                        <small class="text-muted">Bạn cần Thiết lập AppPassword cho Email để Gửi mail tự động.<a href="Guide.html" target="_blank">Here</a></small>
                                     </div>
                                     
                                     <div class="row">

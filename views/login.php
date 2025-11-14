@@ -213,12 +213,20 @@ $pageTitle = "Đăng nhập - Hệ thống nghỉ phép";
                         <span>admin</span>
                     </div>
                     <div class="demo-account">
-                        <strong><i class="fas fa-user-tie text-primary"></i> Quản lý:</strong>
+                        <strong><i class="fas fa-user-tie text-primary"></i> Quản lý 1:</strong>
                         <span>manager</span>
                     </div>
                     <div class="demo-account">
-                        <strong><i class="fas fa-user text-info"></i> Nhân viên:</strong>
+                        <strong><i class="fas fa-user-tie text-primary"></i> Quản lý 2:</strong>
+                        <span>manager2</span>
+                    </div>
+                    <div class="demo-account">
+                        <strong><i class="fas fa-user text-info"></i> Nhân viên 1:</strong>
                         <span>user1</span>
+                    </div>
+                    <div class="demo-account">
+                        <strong><i class="fas fa-user text-info"></i> Nhân viên 2:</strong>
+                        <span>user2</span>
                     </div>
                 </div>
             </div>
