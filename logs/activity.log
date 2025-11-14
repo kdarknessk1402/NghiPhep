@@ -52,3 +52,5 @@
 [2025-11-14 04:16:42] User: USER001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
 [2025-11-14 04:18:35] User: USER001 | Action: LOGOUT | Description: Đăng xuất
 [2025-11-14 04:18:38] User: USER002 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-14 07:02:00] User: USER002 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
+[2025-11-14 07:02:08] User: ADMIN001 | Action: LOGIN_SUCCESS | Description: Đăng nhập thành công
