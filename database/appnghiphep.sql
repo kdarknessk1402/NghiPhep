@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: 127.0.0.1
--- Thời gian đã tạo: Th10 14, 2025 lúc 01:18 AM
+-- Thời gian đã tạo: Th10 14, 2025 lúc 09:55 AM
 -- Phiên bản máy phục vụ: 10.4.32-MariaDB
 -- Phiên bản PHP: 8.2.12
 
@@ -45,6 +45,27 @@ CREATE TABLE `cauhinhemail` (
 
 INSERT INTO `cauhinhemail` (`MaCauHinh`, `SmtpHost`, `SmtpPort`, `SmtpUsername`, `SmtpPassword`, `EmailNguoiGui`, `TenNguoiGui`, `EmailNhan`, `NgayCapNhat`) VALUES
 (1, 'smtp.gmail.com', 587, 'thbao.thuduc@gmail.com', 'gzgiilqoihmefzve', 'thbao.thuduc@gmail.com', 'Hệ thống nghỉ phép', 'admin@school.edu.vn', '2025-11-11 07:12:08');
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `departments`
+--
+
+CREATE TABLE `departments` (
+  `id` int(11) NOT NULL,
+  `name` varchar(255) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Đang đổ dữ liệu cho bảng `departments`
+--
+
+INSERT INTO `departments` (`id`, `name`) VALUES
+(1, 'Khoa Công nghệ thông tin'),
+(2, 'Phòng Hành chính'),
+(3, 'Khoa Điện tử'),
+(4, 'Khoa Ngoại ngữ');
 
 -- --------------------------------------------------------
 
@@ -217,7 +238,29 @@ INSERT INTO `nguoidung` (`MaNguoiDung`, `TenDangNhap`, `MatKhau`, `HoTen`, `Emai
 ('MGR001', 'manager', '$2y$10$BT6yImKCAbgJ5swoRChxweMAy6Vk4vWY4N9354qfCJsHcIJdiVyJe', 'Lê Văn Quản lý', 'kdarknessk1402@gmail.com', 'Nam', 'Trưởng khoa', 'Khoa Công nghệ', 3, '2019-09-01 00:00:00', 12, 0.0, 0.0, NULL, '2025-11-10 09:16:36'),
 ('MGR002', 'manager2', '$2y$10$veApIBNhO3tnvxPYhlcTyedMReOcOKNy.dpW1YGpCrUhggC4Xd8.y', 'Trần Văn Manager 2', 'manager2@school.edu.vn', 'Nam', 'Trưởng khoa', 'Khoa Kinh tế', 3, '2020-01-01 00:00:00', 12, 0.0, 0.0, NULL, '2025-11-12 00:33:30'),
 ('USER001', 'user1', '$2y$10$weY6fDQ0faZzBkEY32lK3u3IIKTEASoGccyvMMYkJItgxTqD7XdQm', 'Trần Thị User', 'thbao.thuduc@gmail.com', 'Nu', 'Giảng viên', 'Khoa Công nghệ', 2, '2021-06-15 00:00:00', 12, 8.0, 4.0, 2024, '2025-11-10 09:16:36'),
-('USER002', 'user2', '$2y$10$dpgK3djqPuUUrKb5kKeUX.Yxmt2Em.M..YFZdfw4lLsnQVUkFztUe', 'Nguyễn Thị B', 'user2@school.edu.vn', 'Nu', 'Giảng viên', 'Khoa Kinh tế', 2, '2022-01-01 00:00:00', 12, 0.0, 0.0, NULL, '2025-11-12 00:33:30');
+('USER002', 'user2', '$2y$10$dpgK3djqPuUUrKb5kKeUX.Yxmt2Em.M..YFZdfw4lLsnQVUkFztUe', 'Nguyễn Thị B', 'user2@school.edu.vn', 'Nu', '', 'Khoa Công nghệ thông tin', 2, '2022-01-01 00:00:00', 12, 0.0, 0.0, NULL, '2025-11-12 00:33:30');
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `roles`
+--
+
+CREATE TABLE `roles` (
+  `id` int(11) NOT NULL,
+  `name` varchar(255) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Đang đổ dữ liệu cho bảng `roles`
+--
+
+INSERT INTO `roles` (`id`, `name`) VALUES
+(1, 'Giảng Viên'),
+(2, 'Nhân viên hành chính'),
+(3, 'Trưởng khoa/phòng'),
+(4, 'Phó hiệu trưởng Quản lý'),
+(5, 'Trưởng phòng hành chính');
 
 -- --------------------------------------------------------
 
@@ -282,6 +325,12 @@ ALTER TABLE `cauhinhemail`
   ADD PRIMARY KEY (`MaCauHinh`);
 
 --
+-- Chỉ mục cho bảng `departments`
+--
+ALTER TABLE `departments`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Chỉ mục cho bảng `donnghiphep`
 --
 ALTER TABLE `donnghiphep`
@@ -332,6 +381,12 @@ ALTER TABLE `nguoidung`
   ADD KEY `MaVaiTro` (`MaVaiTro`);
 
 --
+-- Chỉ mục cho bảng `roles`
+--
+ALTER TABLE `roles`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Chỉ mục cho bảng `vaitro`
 --
 ALTER TABLE `vaitro`
@@ -347,6 +402,12 @@ ALTER TABLE `vaitro`
 --
 ALTER TABLE `cauhinhemail`
   MODIFY `MaCauHinh` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT cho bảng `departments`
+--
+ALTER TABLE `departments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT cho bảng `lichdaybu`
@@ -371,6 +432,12 @@ ALTER TABLE `lichsuphepton`
 --
 ALTER TABLE `nghibu`
   MODIFY `MaNghiBu` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT cho bảng `roles`
+--
+ALTER TABLE `roles`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT cho bảng `vaitro`
