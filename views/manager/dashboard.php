@@ -262,6 +262,12 @@ $pageTitle = "Quản lý đơn nghỉ phép - " . $managerDept;
                             <i class="fas fa-building"></i> <?= htmlspecialchars($managerDept) ?>
                         </span>
                     </div>
+
+                     <div class="d-flex justify-content-between align-items-center mb-4">
+                        <a href="create_leave_for_employee.php" class="btn btn-success">
+                            <i class="fas fa-user-plus"></i> Tạo đơn cho nhân viên
+                        </a>
+                    </div>
                 </div>
                 
                 <!-- Thống kê -->

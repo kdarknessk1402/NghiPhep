@@ -39,34 +39,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     ");
                     $stmt->execute([$ghiChu, $maDon]);
                     
-                    // Cập nhật số ngày phép đã dùng
-                    $stmt = $pdo->prepare("
-                        UPDATE NguoiDung 
-                        SET SoNgayPhepDaDung = SoNgayPhepDaDung + ?
-                        WHERE MaNguoiDung = ?
-                    ");
-                    $stmt->execute([$don['SoNgayNghi'], $don['MaNguoiDung']]);
+                    // QUAN TRỌNG: Chỉ trừ phép nếu TinhVaoPhepNam = 1
+                    // Phép thai sản, phép hiếu, phép hỷ KHÔNG trừ vào 12 ngày
+                    if ($don['TinhVaoPhepNam'] == 1) {
+                        $stmt = $pdo->prepare("
+                            UPDATE NguoiDung 
+                            SET SoNgayPhepDaDung = SoNgayPhepDaDung + ?
+                            WHERE MaNguoiDung = ?
+                        ");
+                        $stmt->execute([$don['SoNgayNghi'], $don['MaNguoiDung']]);
+                        
+                        $logNote = "Duyệt đơn: $maDon (Đã trừ {$don['SoNgayNghi']} ngày phép)";
+                    } else {
+                        $logNote = "Duyệt đơn: $maDon ({$don['LoaiPhep']} - Không trừ phép)";
+                    }
                     
                     // Gửi email thông báo
                     sendLeaveRequestNotification($maDon, $don['Email'], 'approve');
                     
-                    logActivity($currentUser['id'], 'APPROVE_LEAVE', "Duyệt đơn: $maDon");
+                    logActivity($currentUser['id'], 'APPROVE_LEAVE', $logNote);
                     setFlashMessage('success', "Đã duyệt đơn $maDon");
                     
-                } elseif ($action === 'reject') {
-                    // Cập nhật trạng thái đơn
-                    $stmt = $pdo->prepare("
-                        UPDATE DonNghiPhep 
-                        SET TrangThai = 'DENY', GhiChuAdmin = ?
-                        WHERE MaDon = ?
-                    ");
-                    $stmt->execute([$ghiChu, $maDon]);
-                    
-                    // Gửi email thông báo
-                    sendLeaveRequestNotification($maDon, $don['Email'], 'reject');
-                    
-                    logActivity($currentUser['id'], 'REJECT_LEAVE', "Từ chối đơn: $maDon");
-                    setFlashMessage('warning', "Đã từ chối đơn $maDon");
+                    header('Location: dashboard.php');
+                    exit;
                 }
             }
             

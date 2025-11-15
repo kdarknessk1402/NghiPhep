@@ -36,6 +36,9 @@ if (!$userInfo) {
 }
 
 // Xử lý form submit
+// THAY THẾ phần xử lý POST trong create_leave.php
+// Tìm: if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $loaiPhep = sanitizeInput($_POST['loai_phep'] ?? '');
     $ngayBatDau = $_POST['ngay_bat_dau'] ?? '';
@@ -43,6 +46,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nuaNgayBatDau = $_POST['nua_ngay_bat_dau'] ?? 'Khong';
     $nuaNgayKetThuc = $_POST['nua_ngay_ket_thuc'] ?? 'Khong';
     $lyDo = sanitizeInput($_POST['ly_do'] ?? '');
+    
+    // XÁC ĐỊNH loại đơn có tính vào phép năm không
+    $loaiPhepKhongTinh = ['Phép thai sản', 'Phép hiếu', 'Phép hỷ', 'Phép không lương'];
+    $tinhVaoPhepNam = in_array($loaiPhep, $loaiPhepKhongTinh) ? 0 : 1;
     
     $errors = [];
     
@@ -66,8 +73,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $nuaNgayKetThuc
         );
         
-        // Kiểm tra số ngày phép còn lại (trừ phép thai sản)
-        if ($loaiPhep !== 'Phép thai sản' && $soNgayNghi > $userInfo['SoNgayPhepConLai']) {
+        // QUAN TRỌNG: Chỉ kiểm tra phép còn lại nếu TinhVaoPhepNam = 1
+        if ($tinhVaoPhepNam == 1 && $soNgayNghi > $userInfo['SoNgayPhepConLai']) {
             $errors[] = "Số ngày nghỉ ($soNgayNghi) vượt quá số ngày phép còn lại ({$userInfo['SoNgayPhepConLai']})";
         }
     }
@@ -77,31 +84,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Tạo mã đơn
             $maDon = generateLeaveCode('DN');
             
-            // Insert đơn nghỉ phép
+            // Insert đơn nghỉ phép (CÓ THÊM TinhVaoPhepNam)
             $stmt = $pdo->prepare("
                 INSERT INTO DonNghiPhep 
                 (MaDon, MaNguoiDung, NguoiTao, LoaiPhep, NgayBatDauNghi, NghiNuaNgayBatDau, 
-                 NgayKetThucNghi, NghiNuaNgayKetThuc, SoNgayNghi, LyDo, TrangThai)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'WAITING')
+                 NgayKetThucNghi, NghiNuaNgayKetThuc, SoNgayNghi, LyDo, TrangThai, TinhVaoPhepNam)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'WAITING', ?)
             ");
             
             $stmt->execute([
                 $maDon,
                 $targetUserId,
-                $currentUser['id'], // Người tạo đơn
+                $currentUser['id'],
                 $loaiPhep,
                 $ngayBatDau,
                 $nuaNgayBatDau,
                 $ngayKetThuc,
                 $nuaNgayKetThuc,
                 $soNgayNghi,
-                $lyDo
+                $lyDo,
+                $tinhVaoPhepNam  // <-- Tham số mới
             ]);
             
-            // Gửi email thông báo cho Manager của khoa/phòng và Admin
+            // Gửi email thông báo
             $emailList = [];
             
-            // Lấy email của Manager cùng khoa/phòng
             $stmt = $pdo->prepare("
                 SELECT Email FROM NguoiDung n
                 JOIN VaiTro v ON n.MaVaiTro = v.MaVaiTro
@@ -111,21 +118,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$userInfo['KhoaPhong']]);
             $managerEmails = $stmt->fetchAll(PDO::FETCH_COLUMN);
             
-            // Lấy email của tất cả Admin
             $adminEmails = $pdo->query("
                 SELECT Email FROM NguoiDung n
                 JOIN VaiTro v ON n.MaVaiTro = v.MaVaiTro
                 WHERE v.TenVaiTro = 'ADMIN'
             ")->fetchAll(PDO::FETCH_COLUMN);
             
-            // Gộp danh sách email (loại bỏ trùng lặp)
             $emailList = array_unique(array_merge($managerEmails, $adminEmails));
             
             if (!empty($emailList)) {
                 sendLeaveRequestNotification($maDon, $emailList, 'create');
             }
             
-            // Log activity
             logActivity($currentUser['id'], 'CREATE_LEAVE', "Tạo đơn nghỉ phép: $maDon" . 
                 ($isAdminCreateForOther ? " cho user: $targetUserId" : ""));
             
@@ -272,16 +276,25 @@ $pageTitle = "Tạo đơn nghỉ phép";
                                     </label>
                                     <select class="form-select" name="loai_phep" id="loaiPhep" required>
                                         <option value="">-- Chọn loại phép --</option>
-                                        <option value="Phép năm">Phép năm</option>
-                                        <option value="Phép ốm">Phép ốm</option>
-                                        <option value="Phép việc riêng">Phép việc riêng</option>
-                                        <option value="Phép không lương">Phép không lương</option>
-                                        <?php if ($userInfo['GioiTinh'] == 'Nu'): ?>
-                                        <option value="Phép thai sản">Phép thai sản (Chỉ dành cho nữ)</option>
-                                        <?php endif; ?>
-                                        <option value="Phép hiếu">Phép hiếu</option>
-                                        <option value="Phép hỷ">Phép hỷ</option>
-                                    </select>
+                                        
+                                        <!-- Các loại phép TÍNH VÀO 12 ngày -->
+                                        <optgroup label="Phép thường (Tính vào 12 ngày/năm)">
+                                            <option value="Phép năm">📅 Phép năm</option>
+                                            <option value="Phép ốm">🤒 Phép ốm</option>
+                                            <option value="Phép việc riêng">💼 Phép việc riêng</option>
+                                            <option value="Việc cá nhân">👤 Việc cá nhân</option>
+                                            <option value="Việc gia đình">👨‍👩‍👧‍👦 Việc gia đình</option>
+                                        </optgroup>
+                                        
+                                        <!-- Các loại phép KHÔNG TÍNH VÀO 12 ngày -->
+                                        <optgroup label="Phép đặc biệt (Không tính vào 12 ngày)">
+                                            <?php if ($userInfo['GioiTinh'] == 'Nu'): ?>
+                                            <option value="Phép thai sản">🤰 Phép thai sản (6 tháng)</option>
+                                            <?php endif; ?>
+                                            <option value="Phép hiếu">🕊️ Phép hiếu</option>
+                                            <option value="Phép hỷ">💒 Phép hỷ</option>
+                                            <option value="Phép không lương">💵 Phép không lương</option>
+                                        </optgroup>
                                 </div>
                                 
                                 <div class="col-md-6 mb-3">
@@ -289,7 +302,7 @@ $pageTitle = "Tạo đơn nghỉ phép";
                                         <i class="fas fa-info-circle"></i> Số ngày phép còn lại
                                     </label>
                                     <input type="text" class="form-control bg-light" 
-                                           value="<?= $userInfo['SoNgayPhepConLai'] ?> ngày" readonly>
+                                           value="<?= $userInfo['SoNgayPhepConLai'] ?> ngày" readonly hidden>
                                 </div>
                             </div>
                             
@@ -417,14 +430,27 @@ $pageTitle = "Tạo đơn nghỉ phép";
         // Xử lý khi chọn loại phép
         loaiPhepSelect.addEventListener('change', function() {
             const loaiPhep = this.value;
+            const noteElement = document.getElementById('loaiPhepNote');
             
+            // Danh sách loại phép KHÔNG tính vào 12 ngày
+            const khongTinhPhep = ['Phép thai sản', 'Phép hiếu', 'Phép hỷ', 'Phép không lương'];
+            
+            if (khongTinhPhep.includes(loaiPhep)) {
+                noteElement.innerHTML = '<i class="fas fa-info-circle text-success"></i> <strong>Loại phép này KHÔNG tính vào 12 ngày phép năm</strong>';
+                noteElement.style.color = '#28a745';
+            } else if (loaiPhep) {
+                noteElement.innerHTML = '<i class="fas fa-info-circle text-warning"></i> Loại phép này sẽ tính vào 12 ngày phép năm';
+                noteElement.style.color = '#856404';
+            } else {
+                noteElement.innerHTML = '';
+            }
+            
+            // Code xử lý thai sản và nửa ngày (GIỮ NGUYÊN CODE CŨ)
             if (loaiPhep === 'Phép thai sản') {
-                // Hiển thị thông báo thai sản
                 maternityInfo.style.display = 'block';
                 halfDayStartOption.style.display = 'none';
                 halfDayEndOption.style.display = 'none';
                 
-                // Auto set ngày kết thúc = ngày bắt đầu + 6 tháng
                 if (ngayBatDau.value) {
                     const startDate = new Date(ngayBatDau.value);
                     startDate.setMonth(startDate.getMonth() + 6);
@@ -432,14 +458,12 @@ $pageTitle = "Tạo đơn nghỉ phép";
                     ngayKetThuc.readOnly = true;
                     calculateLeaveDays();
                 }
-            } else if (loaiPhep === 'Phép năm' || loaiPhep === 'Phép việc riêng') {
-                // Hiển thị option nửa ngày
+            } else if (loaiPhep === 'Phép năm' || loaiPhep === 'Phép việc riêng' || loaiPhep === 'Việc cá nhân' || loaiPhep === 'Việc gia đình') {
                 maternityInfo.style.display = 'none';
                 halfDayStartOption.style.display = 'block';
                 halfDayEndOption.style.display = 'block';
                 ngayKetThuc.readOnly = false;
             } else {
-                // Ẩn tất cả
                 maternityInfo.style.display = 'none';
                 halfDayStartOption.style.display = 'none';
                 halfDayEndOption.style.display = 'none';
