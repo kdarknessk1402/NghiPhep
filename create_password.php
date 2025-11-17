@@ -191,9 +191,9 @@ $users = $pdo->query("SELECT MaNguoiDung, TenDangNhap, HoTen FROM NguoiDung")->f
                     <h5><i class="fas fa-bolt"></i> Reset nhanh tất cả tài khoản về mật khẩu: <strong>123456</strong></h5>
                     <p class="mb-2">Chạy SQL sau trong phpMyAdmin:</p>
                     <div class="hash-output">
-UPDATE NguoiDung SET 
-    MatKhau = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'
-WHERE TenDangNhap IN ('admin', 'user1', 'manager');
+                        UPDATE NguoiDung SET 
+                            MatKhau = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'
+                        WHERE TenDangNhap IN ('admin', 'user1', 'manager');
                     </div>
                 </div>
                 
